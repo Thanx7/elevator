@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="Ant plus Git" default="build">
+
+    <property file="${basedir}/build.properties"/>
+
+    <target name="build">    
+        <echo message="GIT Tag - ${git.tag}"/>   
+        <exec executable="cmd" dir="${basedir}"> 
+            <arg value="/c"/>
+            <arg value="git"/> 
+            <arg value="add"/> 
+            <arg value="--all"/>
+        </exec>
+        <exec executable="cmd" dir="${basedir}"> 
+            <arg value="/c"/>
+            <arg value="git"/> 
+            <arg value="commit"/> 
+            <arg value="-m"/>
+            <arg value="${message}"/>
+        </exec>
+    </target>
+    
+</project>
