@@ -1,2 +1,8 @@
 /bin
+/target/classes
+/target/generated-sources
+/target/maven-archiver
+/target/test-classes
 /target
+.classpath
+.project

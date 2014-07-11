@@ -133,14 +133,14 @@ public class Controller extends JPanel {
 			if (up) {
 				currentFloor++;
 				if (currentFloor > storeysNumber) {
-					// elevator reverts to down direction
+					// elevator turns down
 					up = false;
 					currentFloor -= 2;
 				}
 			} else {
 				currentFloor--;
 				if (currentFloor < 1) {
-					// elevator reverts to up direction
+					// elevator turns up
 					up = true;
 					currentFloor += 2;
 				}
