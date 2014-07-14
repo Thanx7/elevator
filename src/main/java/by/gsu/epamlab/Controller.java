@@ -28,6 +28,7 @@ import org.apache.log4j.Logger;
 import by.gsu.epamlab.beans.Passenger;
 
 public class Controller extends JPanel {
+	static int counterTmp = 0;
 	private static final long serialVersionUID = 1L;
 	private static final Logger LOGGER = Logger.getLogger(Controller.class);
 
@@ -40,9 +41,7 @@ public class Controller extends JPanel {
 	private Map<Integer, List<Passenger>> arrival = new HashMap<>();
 	private int currentFloor = 1;
 
-	// startWait: all the passengers should be locked at the start
-	private boolean startWait = true;
-	private byte[] notificationLock = new byte[0];
+	private byte[] elevatorLock = new byte[0];
 	private int issuedNotificationsLoad = 0;
 	private int issuedNotificationsUnload = 0;
 
@@ -74,12 +73,8 @@ public class Controller extends JPanel {
 		return currentFloor;
 	}
 
-	public boolean isStartWait() {
-		return startWait;
-	}
-
-	public byte[] getNotificationLock() {
-		return notificationLock;
+	public byte[] getElevatorLock() {
+		return elevatorLock;
 	}
 
 	public int getIssuedNotificationsLoad() {
@@ -106,7 +101,7 @@ public class Controller extends JPanel {
 	}
 
 	private void eController() {
-		// random distribution of the passengers
+		// random distribution of the passengers in the initial dispatch map
 		dispatchNotStarted();
 		creatingThreads();
 
@@ -120,36 +115,34 @@ public class Controller extends JPanel {
 		}
 
 		LOGGER.info(Constants.STARTING_TRANSPORTATION);
-		boolean up = true;
-		do {
+		boolean up = true;// initial direction of the elevator is up
+		do { // main loop
 			notifyElevatorPassengers();
 			notifyDispatchPassengers(up);
 
 			if (allTasksCopmleted() || abort)
 				break;
 
-			// moving from the floor to the floor
-			int first = currentFloor;
+			// moving from the current floor to the next floor
+			int current = currentFloor;
 			if (up) {
 				currentFloor++;
 				if (currentFloor > storeysNumber) {
-					// elevator turns down
-					up = false;
+					up = false; // elevator turns down
 					currentFloor -= 2;
 				}
 			} else {
 				currentFloor--;
 				if (currentFloor < 1) {
-					// elevator turns up
-					up = true;
+					up = true; // elevator turns up
 					currentFloor += 2;
 				}
 			}
-			int second = currentFloor;
+			int next = currentFloor;
 
 			String formatted = String.format(
-					"MOVING_ELEVATOR (from story-%s to story-%s)", first,
-					second);
+					"MOVING_ELEVATOR (from story-%s to story-%s)", current,
+					next);
 			LOGGER.info(formatted);
 
 			if (animationBoost > 0) {
@@ -166,11 +159,10 @@ public class Controller extends JPanel {
 
 	// check if all the tasks are completed
 	private boolean allTasksCopmleted() {
+
 		boolean allTransportationStateCompleted = true;
 		boolean equalsFloors = true;
-		boolean equalsQuantity = false;
 		int count = 0;
-
 		for (Map.Entry<Integer, List<Passenger>> entry : arrival.entrySet()) {
 			List<Passenger> passengerList = entry.getValue();
 			count += passengerList.size();
@@ -184,6 +176,7 @@ public class Controller extends JPanel {
 			}
 		}
 
+		boolean equalsQuantity = false;
 		if (count == passengersNumber)
 			equalsQuantity = true;
 
@@ -215,26 +208,24 @@ public class Controller extends JPanel {
 		issuedNotificationsUnload = 0;
 		List<Passenger> tmp = new ArrayList<>();
 
-		synchronized (this) {
-			for (Passenger p : elevatorContainer) {
-				if (this.getCurrentFloor() == p.getDestinationStorey()) {
-					issuedNotificationsUnload++;
-					tmp.add(p);
-				}
+		for (Passenger p : elevatorContainer) {
+			if (this.getCurrentFloor() == p.getDestinationStorey()) {
+				issuedNotificationsUnload++;
+				tmp.add(p);
 			}
 		}
 
 		// wait for all passengers unload
 		if (issuedNotificationsUnload > 0) {
-			synchronized (notificationLock) {
+			synchronized (elevatorLock) {
 				for (Passenger p : tmp) {
-					byte[] passengerLock = p.getLock2();
+					byte[] passengerLock = p.getLockOut();
 					synchronized (passengerLock) {
 						passengerLock.notify();
 					}
 				}
 				try {
-					notificationLock.wait();
+					elevatorLock.wait();
 				} catch (InterruptedException e) {
 				}
 			}
@@ -250,16 +241,19 @@ public class Controller extends JPanel {
 			label.setText(formatted);
 		}
 
+		// put the passenger into the arrival map
 		List<Passenger> arrivalStoreyContainer;
 		try {
 			arrivalStoreyContainer = arrival.get(p.getDestinationStorey());
 			arrivalStoreyContainer.add(p);
 		} catch (NullPointerException e) {
+			// create new container if not exist
 			arrivalStoreyContainer = new ArrayList<>();
 			arrivalStoreyContainer.add(p);
 			arrival.put(p.getDestinationStorey(), arrivalStoreyContainer);
 		}
 
+		// delete the passenger from the elevator
 		for (ListIterator<Passenger> it = elevatorContainer.listIterator(); it
 				.hasNext();) {
 			if (it.next().equals(p)) {
@@ -279,7 +273,6 @@ public class Controller extends JPanel {
 	}
 
 	private void notifyDispatchPassengers(boolean up) {
-		startWait = false;
 		issuedNotificationsLoad = 0;
 		int elevatorPassengers = elevatorContainer.size();
 
@@ -287,24 +280,21 @@ public class Controller extends JPanel {
 		int permissionsEnterElevator = elevatorCapacity - elevatorPassengers;
 		List<Passenger> tmp = new ArrayList<>();
 
-		synchronized (this) {
-			for (Map.Entry<Integer, List<Passenger>> entry : dispatch
-					.entrySet()) {
-				if (entry.getKey().equals(currentFloor)) {
-					for (Passenger p : entry.getValue()) {
-						// take only people the same direction with the elevator
-						boolean sameDirection = false;
-						if (((p.getInitialStorey() < p.getDestinationStorey()) && up)
-								|| p.getInitialStorey() == 1)
-							sameDirection = true;
-						if (((p.getInitialStorey() > p.getDestinationStorey()) && !up)
-								|| p.getInitialStorey() == storeysNumber)
-							sameDirection = true;
-						if (permissionsEnterElevator > 0 && sameDirection) {
-							issuedNotificationsLoad++;
-							permissionsEnterElevator--;
-							tmp.add(p);
-						}
+		for (Map.Entry<Integer, List<Passenger>> entry : dispatch.entrySet()) {
+			if (entry.getKey().equals(currentFloor)) {
+				for (Passenger p : entry.getValue()) {
+					// take only people the same direction with the elevator
+					boolean sameDirection = false;
+					if (((p.getInitialStorey() < p.getDestinationStorey()) && up)
+							|| p.getInitialStorey() == 1)
+						sameDirection = true;
+					if (((p.getInitialStorey() > p.getDestinationStorey()) && !up)
+							|| p.getInitialStorey() == storeysNumber)
+						sameDirection = true;
+					if (permissionsEnterElevator > 0 && sameDirection) {
+						issuedNotificationsLoad++;
+						permissionsEnterElevator--;
+						tmp.add(p);
 					}
 				}
 			}
@@ -312,20 +302,19 @@ public class Controller extends JPanel {
 
 		// wait for passengers load
 		if (issuedNotificationsLoad > 0) {
-			synchronized (notificationLock) {
+			synchronized (elevatorLock) {
 				try {
 					for (Passenger p : tmp) {
-						byte[] passengerLock = p.getLock1();
+						byte[] passengerLock = p.getLockEntry();
 						synchronized (passengerLock) {
 							passengerLock.notify();
 						}
 					}
-					notificationLock.wait();
+					elevatorLock.wait();
 				} catch (InterruptedException e) {
 				}
 			}
 		}
-
 	}
 
 	public synchronized void load(Passenger p) {
@@ -347,6 +336,8 @@ public class Controller extends JPanel {
 
 		elevatorContainer.add(p);
 
+		// passenger has entered to the elevator
+		// so, we have to delete the passenger in the "dispatch" map
 		for (Iterator<Map.Entry<Integer, List<Passenger>>> itMap = dispatch
 				.entrySet().iterator(); itMap.hasNext();) {
 			Map.Entry<Integer, List<Passenger>> entry = itMap.next();
@@ -358,6 +349,8 @@ public class Controller extends JPanel {
 						it.remove();
 					}
 				}
+				// if the storey is empty, we delete this empty
+				// storey from the "dispatch" map
 				if (passengerList.isEmpty()) {
 					itMap.remove();
 				}

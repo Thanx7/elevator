@@ -19,8 +19,8 @@ public class Passenger extends JPanel implements Runnable {
 	private int destinationStorey;
 	private int container;
 	private String transportationState;
-	private byte[] lock1 = new byte[0];
-	private byte[] lock2 = new byte[0];
+	private byte[] lockEntry = new byte[0];
+	private byte[] lockOut = new byte[0];
 	private static volatile int countNotifications1 = 0;
 	private static volatile int countNotifications2 = 0;
 
@@ -73,12 +73,12 @@ public class Passenger extends JPanel implements Runnable {
 		return transportationState;
 	}
 
-	public byte[] getLock1() {
-		return lock1;
+	public byte[] getLockEntry() {
+		return lockEntry;
 	}
 
-	public byte[] getLock2() {
-		return lock2;
+	public byte[] getLockOut() {
+		return lockOut;
 	}
 
 	public void setContainer(int container) {
@@ -127,14 +127,13 @@ public class Passenger extends JPanel implements Runnable {
 	public void run() {
 		this.setTransportationState(Constants.IN_PROGRESS);
 
-		synchronized (lock1) {
-			while (controller.isStartWait()) {
-				try {
-					lock1.wait();
-				} catch (InterruptedException e) {
-				}
+		synchronized (lockEntry) {
+			try {
+				lockEntry.wait();
+			} catch (InterruptedException e) {
 			}
 		}
+
 		if (!controller.isAbort()) {
 			// passenger goes to the elevator
 			controller.load(this);
@@ -142,18 +141,18 @@ public class Passenger extends JPanel implements Runnable {
 			this.setContainer(Constants.ELEVATOR_CONTAINER);
 
 			// notify if all passengers loaded
-			byte[] notificationLock = controller.getNotificationLock();
-			synchronized (notificationLock) {
+			byte[] elevatorLock = controller.getElevatorLock();
+			synchronized (elevatorLock) {
 				if (countNotifications1 == controller
 						.getIssuedNotificationsLoad()) {
 					countNotifications1 = 0;
-					notificationLock.notify();
+					elevatorLock.notify();
 				}
 			}
 
-			synchronized (lock2) {
+			synchronized (lockOut) {
 				try {
-					lock2.wait();
+					lockOut.wait();
 				} catch (InterruptedException e) {
 				}
 			}
@@ -165,11 +164,11 @@ public class Passenger extends JPanel implements Runnable {
 				this.setTransportationState(Constants.COMPLETED);
 
 				// notify if all passengers unloaded
-				synchronized (notificationLock) {
+				synchronized (elevatorLock) {
 					if (countNotifications2 == controller
 							.getIssuedNotificationsUnload()) {
 						countNotifications2 = 0;
-						notificationLock.notify();
+						elevatorLock.notify();
 					}
 				}
 			} else {
