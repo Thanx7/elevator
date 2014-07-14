@@ -28,7 +28,6 @@ import org.apache.log4j.Logger;
 import by.gsu.epamlab.beans.Passenger;
 
 public class Controller extends JPanel {
-	static int counterTmp = 0;
 	private static final long serialVersionUID = 1L;
 	private static final Logger LOGGER = Logger.getLogger(Controller.class);
 
