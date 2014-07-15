@@ -7,6 +7,7 @@ import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -15,6 +16,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
 
 import javax.swing.ImageIcon;
@@ -24,6 +26,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 
 import org.apache.log4j.Logger;
+import org.apache.log4j.PropertyConfigurator;
 
 import by.gsu.epamlab.beans.Passenger;
 
@@ -113,6 +116,13 @@ public class Controller extends JPanel {
 			}
 		}
 
+		Properties props = new Properties();
+		try {
+			props.load(new FileInputStream(Constants.LOG_PROP_FILENAME));
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		PropertyConfigurator.configure(props);
 		LOGGER.info(Constants.STARTING_TRANSPORTATION);
 		boolean up = true;// initial direction of the elevator is up
 		do { // main loop

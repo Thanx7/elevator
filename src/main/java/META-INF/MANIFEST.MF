@@ -1,4 +1,0 @@
-Manifest-Version: 1.0
-Built-By: Aliaksandr_Doubeikovsky
-Build-Jdk: 1.7.0_60
-Main-Class: Runner
